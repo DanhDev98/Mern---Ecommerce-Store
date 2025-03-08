@@ -1,6 +1,27 @@
 import { generateToken } from "../lib/util.js";
 import User from "../model/user.model.js";
 import bcrypt from "bcryptjs";
+import {redis} from "../lib/redis.js";
+import jwt from "jsonwebtoken"; 
+const storeRefreshToken = async (userId,refreshToken) => {
+    await redis.set(`refresh token:${userId}`,refreshToken, "EX",  7*24*60*60);
+}
+
+const setCookie = (res, refreshToken, accessToken) => {
+    res.cookie("accessToken", accessToken, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "strict",
+        maxAge: 15 * 60 * 1000, //15P minutes
+    })
+
+    res.cookie("refreshToken", refreshToken, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "strict",
+        maxAge: 7 * 24 * 60 * 60 * 1000, //7 days
+    })
+}
 export const signup = async (req, res) => {
     const { name, email, password } = req.body;
     try {
@@ -23,7 +44,16 @@ export const signup = async (req, res) => {
             password: hashedPassword,
         });
         await newUser.save();
-        res.status(201).json({ message: "User registered successfully", newUser });
+        //authenticate user
+        const {accessToken, refreshToken} = generateToken(newUser._id)
+        await storeRefreshToken(newUser._id, refreshToken)
+        setCookie(res, refreshToken, accessToken)
+        res.status(201).json({ message: "User registered successfully", newUser:{
+            _id: newUser._id,
+            name: newUser.name,
+            email: newUser.email,
+            role: newUser.role
+        } });
     } catch (error) {
         console.log("Error in signup: ", error.message);
         res.status(500).json({ message: "Server error" });
@@ -47,7 +77,14 @@ export const login = async (req, res) => {
 
         //authenticate user
         const { accessToken, refreshToken } = generateToken(user._id)
-        res.status(200).json({ message: "Login successful", user })
+        await storeRefreshToken(user._id, refreshToken)
+        setCookie(res, refreshToken, accessToken)
+        res.status(200).json({ message: "Login successful", user: {
+            _id: user._id,
+            name: user.name,
+            role: user.role,
+            email: user.email,
+        } })
     } catch (error) {
         console.log("Error in login: ", error.message);
         res.status(500).json({ message: "Server error" });
@@ -56,5 +93,43 @@ export const login = async (req, res) => {
 
 
 export const logout = (req, res) => {
-    res.send("logout route");
+    try {
+        const refreshToken = req.cookies.refreshToken
+        if(refreshToken){
+            const decoded = jwt.verify(refreshToken, process.env.REFRESH_TOKEN_SECRET)
+            redis.del(`refresh token:${decoded.userId}`)
+        }
+        res.clearCookie("accessToken")
+        res.clearCookie("refreshToken") 
+        res.status(200).json({ message: "Logout successful" });
+    } catch (error) {
+        console.log("Error in logout: ", error.message);
+        res.status(500).json({ message: "Server error" });
+    }
 };
+
+export const refreshTokens = async (req, res) => {
+    try {
+        const refreshToken = req.cookies.refreshToken
+        if(!refreshToken){
+            return res.status(400).json({message: "No refresh token"})
+        }
+        const decoded = jwt.verify(refreshToken, process.env.REFRESH_TOKEN_SECRET)
+        const token = await redis.get(`refresh token:${decoded.userId}`)
+        if(token !== refreshToken){
+            return res.status(400).json({message: "Invalid refresh token"})
+        }
+
+        const accessToken = jwt.sign({userId: decoded.userId}, process.env.ACCESS_TOKEN_SECRET, {expiresIn: "15m"})
+        res.cookie("accessToken", accessToken, {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === "production",
+            sameSite: "strict",
+            maxAge: 15 * 60 * 1000, //15P minutes
+        })
+        res.status(200).json({message: "Refresh token successful"})
+    } catch (error) {
+        console.log("Error in refreshTokens: ", error.message);
+        res.status(500).json({ message: "Server error" });
+    }
+}
