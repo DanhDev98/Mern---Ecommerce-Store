@@ -12,7 +12,7 @@ const App = () => {
           <div className="absolute top-0 left-0.5 -translate-x-0.5 w-full h-full bg-gradient-to-b from-indigo-500 via-purple-500 to-pink-500 ... "></div>
         </div>
       </div>
-      <div className="z-20 pt-20 absolute ">
+      <div className="z-20 pt-20 absolute flex flex-col w-full  ">
         <Navbar />
         <Routes>
           <Route path="/" element={<HomePage />} />
