@@ -94,6 +94,7 @@ export const login = async (req, res) => {
         name: user.name,
         role: user.role,
         email: user.email,
+        cartItems: user.cartItems
       },
     });
   } catch (error) {
@@ -153,9 +154,14 @@ export const refreshTokens = async (req, res) => {
 
 export const getProfile = async (req, res) => {
   try {
-    res.json(req.user);
+    if (!req.user) {
+      return res.status(401).json({ message: "Unauthorized: No user data" });
+    }
+
+    res.json({ user: req.user }); // Trả về user đúng format
   } catch (error) {
-    console.log("error from getProfile", error.message);
+    console.log("Error from getProfile:", error.message);
     res.status(500).json({ message: "Internal server error" });
   }
 };
+

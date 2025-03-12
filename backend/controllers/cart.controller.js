@@ -2,49 +2,68 @@ import Product from "../model/product.model.js";
 
 export const getCartProducts = async (req, res) => {
     try {
-        const products = await Product.find({ _id: { $in: req.user.cardItems } })
+        // ✅ Đảm bảo req.user.cartItems không bị undefined
+        if (!req.user || !Array.isArray(req.user.cartItems)) {
+            return res.status(400).json({ message: "Cart is empty or user not found" });
+        }
+
+        // ✅ Tìm sản phẩm theo ID trong giỏ hàng
+        const products = await Product.find({ _id: { $in: req.user.cartItems.map(item => item.id) } });
+
+        // ✅ Đảm bảo tìm được `cartItems` hợp lệ
         const cartItems = products.map(product => {
-            const item = req.user.cardItems.find(cartItems => cartItems.id == product._id)
-            return { ...product.toJSON(), quantity: item.quantity }
-        })
-        res.json(cartItems)
+            const item = req.user.cartItems.find(cartItem => cartItem.id == product._id);
+            return item ? { ...product.toJSON(), quantity: item.quantity } : null;
+        }).filter(item => item !== null); // Xóa các giá trị null nếu không tìm thấy sản phẩm phù hợp
+
+        res.json(cartItems);
     } catch (error) {
-        console.log("Error from getCartProducts", error.message);
-        res.status(500).json({ message: "Server Error" })
+        console.log("Error from getCartProducts:", error.message);
+        res.status(500).json({ message: "Server Error" });
     }
-}
+};
+
 export const addToCart = async (req, res) => {
     try {
-        const { productId } = req.body
-        const userId = req.user._id
+        const { productId } = req.body;
+        const user = req.user; // Lấy user từ middleware auth
+        console.log("User:", user);
 
-        const existingProduct = await user.cardItems.find(item => item.id == productId)
+        if (!user.cartItems) {
+            user.cartItems = []; // ✅ Đảm bảo `cartItems` luôn tồn tại 
+        }
+
+        // Kiểm tra sản phẩm đã có trong giỏ chưa
+        const existingProduct = user.cartItems.find(item => item.product === productId);
+
         if (existingProduct) {
-            existingProduct.quantity += 1
-        }
-        else {
-            user.cardItems.push({ productId })
+            existingProduct.quantity += 1; // ✅ Tăng số lượng nếu sản phẩm đã có
+        } else {
+            user.cartItems.push(productId);
+            ; // ✅ Đúng schema
         }
 
-        await user.save()
-        res.json({ message: "Add to cart success" }, user.cardItems)
+        await user.save(); // ✅ Lưu vào MongoDB
+        res.json({ message: "Add to cart success", cart: user.cartItems });
     } catch (error) {
-        console.log("Error from addToCart", error.message);
-        res.status(500).json({ message: "Server Error" })
+        console.error("Error from addToCart:", error.message);
+        res.status(500).json({ message: "Server Error" });
     }
-}
+};
+
+
 
 export const removeProductFromCart = async (req, res) => {
     try {
         const { productId } = req.body
-        const userId = req.user._id
+        const user = req.user
         if (!productId) {
-            user.cardItems = []
+            user.cartItems = []
         } else {
-            user.cardItems = user.cardItems.filter(item => item.id != productId)
+            user.cartItems = user.cartItems.filter(item => item.id != productId)
         }
         await user.save()
-        res.json({ message: "Remove product from cart success" }, user.cardItems)
+        res.status(200).json(user.cartItems)
     } catch (error) {
         console.log("Error from removeProductFromCart", error.message);
         res.status(500).json({ message: "Server Error" })
@@ -54,19 +73,19 @@ export const removeProductFromCart = async (req, res) => {
 
 export const updateQuantity = async (req, res) => {
     try {
-        const { id } = req.params
-        const userId = req.user._id
+        const { id: productId } = req.params
+        const user = req.user
         const { quantity } = req.body
-        const existingProduct = user.cardItems.find(item => item.id == productId)
+        const existingProduct = user.cartItems.find(item => item.id == productId)
         if (existingProduct) {
             if (quantity == 0) {
-                user.cardItems = user.cardItems.filter(item => item.id != productId)
+                user.cartItems = user.cartItems.filter(item => item.id != productId)
                 await user.save()
-                return res.json(user.cardItems)
+                return res.json(user.cartItems)
             }
             existingProduct.quantity = quantity
             await user.save()
-            return res.json(user.cardItems)
+            return res.json(user.cartItems)
         } else {
             return res.status(404).json({ message: "Product not found in cart" })
         }

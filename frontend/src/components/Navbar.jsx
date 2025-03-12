@@ -9,8 +9,10 @@ import {
   UserPlus,
 } from "lucide-react";
 import { useAuthStore } from "../store/useAuthStore";
+import { useCartStore } from "../store/useCartStore";
 const Navbar = () => {
   const { user, logout, isAdmin } = useAuthStore();
+  const { cart } = useCartStore()
   console.log("check admin", isAdmin);
 
   return (
@@ -43,7 +45,7 @@ const Navbar = () => {
                 Cart
               </span>
               <span className="absolute sm:-top-2 sm:right-11 -top-2 right-4 bg-blue-500 text-white rounded-full px-1.5 py-0.5 text-xs group-hover:bg-green-700 transition duration-300 ease-in-out">
-                3
+                {cart.length}
               </span>
             </Link>
           )}

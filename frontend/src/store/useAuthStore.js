@@ -51,9 +51,10 @@ export const useAuthStore = create((set, get) => ({
     set({ isCheckingAuth: true });
     try {
       const res = await axiosInstance.get("/auth/profile");
-      set({ user: res.data, isAdmin: res.data.user.role === "admin" });
+      set({ user: res.data.user, isAdmin: res.data.user.role === "admin", isCheckingAuth: false });
     } catch (error) {
       set({ isCheckingAuth: false, user: null });
+      toast.error(error.response.data.message);
     }
   },
 
@@ -63,7 +64,57 @@ export const useAuthStore = create((set, get) => ({
       set({ user: null, isAdmin: false });
       toast.success("Logout sucessfull");
     } catch (error) {
-      toast.error(error.response.data.message);
+      console.log(error.message)
+    }
+  },
+
+  refreshToken: async () => {
+    // Prevent multiple simultaneous refresh attempts
+    if (get().isCheckingAuth) return;
+
+    set({ isCheckingAuth: true });
+    try {
+      const response = await axiosInstance.post("/auth/refresh-token");
+      set({ isCheckingAuth: false });
+      return response.data;
+    } catch (error) {
+      set({ user: null, isCheckingAuth: false });
+      throw error;
     }
   },
 }));
+
+
+// Axios interceptor for token refresh
+let refreshPromise = null;
+
+axiosInstance.interceptors.response.use(
+  (response) => response,
+  async (error) => {
+    const originalRequest = error.config;
+    if (error.response?.status === 401 && !originalRequest._retry) {
+      originalRequest._retry = true;
+
+      try {
+        // If a refresh is already in progress, wait for it to complete
+        if (refreshPromise) {
+          await refreshPromise;
+          return axiosInstance(originalRequest);
+        }
+
+        // Start a new refresh process
+        refreshPromise = useAuthStore.getState().refreshToken();
+        await refreshPromise;
+        refreshPromise = null;
+
+        return axiosInstance(originalRequest);
+      } catch (refreshError) {
+        // If refresh fails, redirect to login or handle as needed
+        useAuthStore.getState().logout();
+        return Promise.reject(refreshError);
+      }
+    }
+    return Promise.reject(error);
+  }
+);
+

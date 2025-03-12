@@ -1,9 +1,10 @@
 import { BarChart, PlusCircle, ShoppingBasket } from "lucide-react";
-import { useState } from "react";
-import { motion } from "motion";
+import { useEffect, useState } from "react";
+import { motion } from "motion/react";
 import AnalyticsChart from "../components/AnalyticsChart";
 import ProductList from "../components/ProductList";
 import CreateProductForm from "../components/CreateProductForm";
+import { useProductStore } from "../store/useProductStore";
 const tabs = [
   { id: "create", label: "Create Product", icon: PlusCircle },
   { id: "products", label: "Products", icon: ShoppingBasket },
@@ -12,8 +13,11 @@ const tabs = [
 
 const DashboardPage = () => {
   const [active, setActive] = useState("create");
+  const { fetchAllProduct } = useProductStore()
+  useEffect(() => { fetchAllProduct() }, [fetchAllProduct])
+
   return (
-    <div className="min-h-screen bg-gray-900 text-white relative overflow-hidden ">
+    <div className="min-h-screen bg-gray-900 text-white relative overflow-hidden mt-10">
       <div className="relative z-10 container mx-auto px-4 py-16 ">
         <motion.h1
           className="text-4xl font-bold mb-8 text-pink-500 text-center"
@@ -27,13 +31,12 @@ const DashboardPage = () => {
         <div className="flex justify-center mb-8">
           {tabs.map((tab) => (
             <button
-              key={tabs.id}
+              key={tab.id}
               onClick={() => setActive(tab.id)}
-              className={`flex items-center px-4 py-2 mx-2 rounded-md transition-colors duration-200 ${
-                active === tab.id
-                  ? "bg-pink-600 text-white"
-                  : "bg-gray-700 text-gray-300 hover:bg-pink-500"
-              }`}
+              className={`flex items-center px-4 py-2 mx-2 rounded-md transition-colors duration-200 ${active === tab.id
+                ? "bg-pink-600 text-white"
+                : "bg-gray-700 text-gray-300 hover:bg-pink-500"
+                }`}
             >
               <tab.icon className="h-5 w-5 mr-2" />
               {tab.label}

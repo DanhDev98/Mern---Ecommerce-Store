@@ -1,8 +1,8 @@
 import mongoose from "mongoose";
 
 const productSchema = new mongoose.Schema({
-   name: {
-      type: String,
+    name: {
+        type: String,
         required: true,
     },
     description: {
@@ -22,10 +22,10 @@ const productSchema = new mongoose.Schema({
         type: String,
         required: true,
     },
-    isFetured: {
+    isFeatured: {
         type: Boolean,
         default: false,
-    }, 
+    },
 }, { timestamps: true });
 
 const Product = mongoose.model("Product", productSchema);   // Product model

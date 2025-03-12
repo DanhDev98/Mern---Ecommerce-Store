@@ -1,7 +1,10 @@
 // Glasses, shoes, shirt, pants, hat, lipstick.
+import { useEffect } from "react";
 import CategoryItems from "../components/CategoryItems";
+import { useProductStore } from "../store/useProductStore";
+import FeaturedProducts from "../components/FeaturedProducts";
 const category = [
-  { href: "/glasses", name: "Glasses", imageUrl: "/kiếng.jpg" },
+  { href: "/bags", name: "Bags", imageUrl: "/tuixach.png" },
   { href: "/shirt", name: "Shirt", imageUrl: "/áo.jpg" },
   { href: "/pants", name: "Pants", imageUrl: "/quần.jpg" },
   { href: "/shoes", name: "Shoes", imageUrl: "/giày.jpg" },
@@ -9,6 +12,11 @@ const category = [
   { href: "/lipstick", name: "Lipstick", imageUrl: "/son.jpg" },
 ];
 const HomePage = () => {
+  const { fetchFeaturedProducts, products, loading } = useProductStore();
+  useEffect(() => {
+    fetchFeaturedProducts();
+  }, [fetchFeaturedProducts]);
+
   return (
     <div className="relative min-h-screen text-white overflow-y-hidden">
       <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
@@ -23,6 +31,9 @@ const HomePage = () => {
             <CategoryItems cate={cate} key={cate.name} />
           ))}
         </div>
+
+        {!loading && products.length > 0 && <FeaturedProducts featuredProducts={products} />}
+
       </div>
     </div>
   );

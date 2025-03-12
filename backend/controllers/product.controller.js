@@ -15,11 +15,13 @@ export const getAllProducts = async (req, res) => {
 export const getFeaturedProducts = async (req, res) => {
     try {
         let featuredProducts = await redis.get("featured-product")
+        console.log(featuredProducts)
         if (featuredProducts) {
-            return res.json(JSON.parse(getFeaturedProducts))
+            return res.json(JSON.parse(featuredProducts))
         }
 
         featuredProducts = await Product.find({ isFeatured: true }).lean()
+        console.log('check backend', featuredProducts)
         if (!featuredProducts) {
             return res.status(404).json({ message: "No Featured Product found" })
         }
@@ -39,7 +41,6 @@ export const createProducts = async (req, res) => {
         if (image) {
             uploadImgRes = await cloudinary.uploader.upload(image)
         }
-
         const product = new Product({
             name,
             description,
@@ -49,7 +50,7 @@ export const createProducts = async (req, res) => {
         })
 
         await product.save()
-        res.status(200).json({ message: "Create product successfull" }, product)
+        res.status(200).json({ message: "Create product successfull", product })
     } catch (error) {
         console.log("Error from createProduct", error.message);
         res.status(500).json({ message: "Error Server" })
@@ -85,7 +86,7 @@ export const getRecommendProducts = async (req, res) => {
     try {
         const products = await Product.aggregate([
             {
-                $sample: { size: 3 }
+                $sample: { size: 6 }
             },
             {
                 $project: {
@@ -111,7 +112,7 @@ export const getProductCategory = async (req, res) => {
         if (!products) {
             return res.status(404).json({ message: "No Product found" })
         }
-        res.json(products)
+        res.json({ products })
     } catch (error) {
         console.log("Error from getProductCategory", error.message)
         return res.status(500).json({})
@@ -125,10 +126,10 @@ export const toggleFeaturedProducts = async (req, res) => {
         const product = await Product.findById(idProduct)
         if (product) {
             product.isFeatured = !product.isFeatured
-            await product.save()
+            const updateProduct = await product.save()
             // SAVE trong redis cache
             await updateFeaturedProductCache()
-            res.status(200).json({ message: "Toggle Featured Success" })
+            res.status(200).json(updateProduct)
         }
     } catch (error) {
         console.log("Error from updateProduct", error.message);
